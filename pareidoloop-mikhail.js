@@ -4,6 +4,7 @@ var Pareidoloop = new function() {
     var ticking;
     var genCount;
     var lastImprovedGen;
+    var improvementCount;
     var faceA, faceB;
     var canvasA, canvasB, canvasOut, scoreA, scoreB;
     var outputCallback;
@@ -11,7 +12,6 @@ var Pareidoloop = new function() {
     var settings = {
        CANVAS_SIZE : 50,
        OUTPUT_SIZE : 100,
-       OUTPUT_FORMAT : "png",
        INITIAL_POLYS : 60,
        MAX_POLYS : 1000,
        MAX_GENERATIONS : 6000,
@@ -33,16 +33,13 @@ var Pareidoloop = new function() {
                 settings.OUTPUT_SIZE = args.outputSize;
             }
             if (args.outputCallback) {
-                outputCallback = args.outputCallback;
-            }
+		outputCallback = args.outputCallback;
+	    }
             if (args.confidenceThreshold) {
                 settings.CONFIDENCE_THRESHOLD = args.confidenceThreshold;
             }
             if (args.maxGenerations) {
                 settings.MAX_GENERATIONS = args.maxGenerations;
-            }
-            if (args.outputFormat) {
-                settings.OUTPUT_FORMAT = args.outputFormat;
             }
         }
 
@@ -56,11 +53,6 @@ var Pareidoloop = new function() {
         reset();
         ticking = true;
         tick();
-    }
-
-    this.setOutputFormat = function(outputFormat) {
-
-        settings.OUTPUT_FORMAT = outputFormat == "svg" ? "svg" : "png";
     }
 
     var reset = function() {
@@ -79,6 +71,7 @@ var Pareidoloop = new function() {
         faceB = null;
         genCount = 0;
         lastImprovedGen = 0;
+        improvementCount = 0;
         seeding = true;
     }   
 
@@ -199,62 +192,36 @@ var Pareidoloop = new function() {
             scoreA.innerHTML = message;
 
             lastImprovedGen = genCount;
+            improvementCount++;
             faceA = faceB;
-        }
-
-        if (genCount > settings.MAX_GENERATIONS || 
-                (genCount - lastImprovedGen) > settings.MAX_GENS_WITHOUT_IMPROVEMENT || 
-                fitnessScore > settings.CONFIDENCE_THRESHOLD) {
 
             // render finished face out as an image
-            var outCtx = initOutputCtx();
-
+            
+            var outCtx = canvasOut.getContext("2d");
+            var outScale = settings.OUTPUT_SIZE/settings.CANVAS_SIZE;
+            outCtx.scale(outScale, outScale);
             faceA.draw(outCtx);
+            var dataUrl = canvasOut.toDataURL();
             
             var outputImg = document.createElement("img");
-            outputImg.src = getDataUrl(outCtx);
+            outputImg.src = dataUrl;
 
-            var title = "Fitness: " + fitnessScore.toPrecision(4) + 
-                        "/" + settings.CONFIDENCE_THRESHOLD.toPrecision(4) + 
-                        " @ Generation: " + genCount + 
-                        "/" + settings.MAX_GENERATIONS;
+	    if (outputCallback) {
+		    outputCallback(outputImg,improvementCount);
+	    }
 
-            outputImg.title = title;
-
-            if (outputCallback) {
-                outputCallback(outputImg);
-            }
-
-            // go again
-            reset();
+	    initCanvas(canvasOut, settings.OUTPUT_SIZE);
+	    clearCanvas(canvasOut);
         }
+
+	    if (genCount > settings.MAX_GENERATIONS || 
+			    (genCount - lastImprovedGen) > settings.MAX_GENS_WITHOUT_IMPROVEMENT || 
+			    fitnessScore > settings.CONFIDENCE_THRESHOLD) {
+		    // go again
+		    reset();
+	    }
 
         setTimeout(tick,1);
-    }
-
-    var getDataUrl = function(outCtx) {
-
-        if ("svg" == settings.OUTPUT_FORMAT) {
-            return "data:image/svg+xml;utf8," + outCtx.getSerializedSvg();
-        } else {
-            return canvasOut.toDataURL();
-        }
-    }
-
-    var initOutputCtx = function() {
-        
-        var outCtx;
-        if ("svg" == settings.OUTPUT_FORMAT) {
-            outCtx = new C2S(settings.OUTPUT_SIZE, settings.OUTPUT_SIZE);
-            outCtx.fillStyle = "#000000";
-            outCtx.fillRect(0,0,settings.OUTPUT_SIZE,settings.OUTPUT_SIZE);
-            outCtx.translate(settings.OUTPUT_SIZE/2,settings.OUTPUT_SIZE/2);
-        } else {
-            outCtx = canvasOut.getContext("2d");
-        }
-        var outScale = settings.OUTPUT_SIZE/settings.CANVAS_SIZE;
-        outCtx.scale(outScale, outScale);
-        return outCtx;
     }
 
 
